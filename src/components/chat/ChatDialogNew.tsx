@@ -1,11 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, X, Bot, User, RotateCcw, Paperclip, File, Upload } from 'lucide-react';
+import { Send, X, Bot, User, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { uploadFileToServer } from '@/lib/fileUpload';
 
 // Types
 interface Message {
@@ -13,11 +11,6 @@ interface Message {
   content: string;
   sender: 'user' | 'bot';
   timestamp: Date;
-  type?: 'text' | 'file';
-  fileName?: string;
-  fileSize?: number;
-  fileUrl?: string;
-  fileStatus?: 'uploading' | 'uploaded' | 'processing' | 'ready';
 }
 
 interface ChatDialogProps {
@@ -41,54 +34,11 @@ function MessageItem({ message }: { message: Message }) {
       )}
 
       <div className="flex flex-col max-w-[80%]">
-        {message.type === 'file' ? (
-          <div className="flex items-start gap-3 bg-muted p-3 rounded-lg">
-            <File className="h-4 w-4 mt-0.5 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium break-all">{message.fileName}</p>
-                {message.fileStatus === 'uploading' && (
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                )}
-                {message.fileStatus === 'uploaded' && (
-                  <div className="w-2 h-2 bg-green-500 rounded-full" />
-                )}
-                {message.fileStatus === 'processing' && (
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-                )}
-                {message.fileStatus === 'ready' && (
-                  <div className="w-2 h-2 bg-green-600 rounded-full" />
-                )}
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                {message.fileSize && (
-                  <p className="text-xs opacity-70">
-                    {(message.fileSize / 1024 / 1024).toFixed(2)} MB
-                  </p>
-                )}
-                {message.fileStatus && (
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    message.fileStatus === 'uploading' ? 'bg-blue-100 text-blue-700' :
-                    message.fileStatus === 'uploaded' ? 'bg-green-100 text-green-700' :
-                    message.fileStatus === 'processing' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-green-100 text-green-800'
-                  }`}>
-                    {message.fileStatus === 'uploading' && 'Загружается...'}
-                    {message.fileStatus === 'uploaded' && 'Загружен'}
-                    {message.fileStatus === 'processing' && 'Обрабатывается...'}
-                    {message.fileStatus === 'ready' && 'Готов к работе'}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className={`px-4 py-2 rounded-lg ${
-            message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
-          }`}>
-            <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-          </div>
-        )}
+        <div className={`px-4 py-2 rounded-lg ${
+          message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
+        }`}>
+          <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+        </div>
 
         <p className="text-xs opacity-70 mt-1 px-1">
           {message.timestamp.toLocaleTimeString('ru-RU', {
@@ -107,64 +57,6 @@ function MessageItem({ message }: { message: Message }) {
   );
 }
 
-function FilePreview({ file, onUpload, onCancel, isUploading }: {
-  file: File;
-  onUpload: () => void;
-  onCancel: () => void;
-  isUploading: boolean;
-}) {
-  return (
-    <div className="p-3 border-b bg-background">
-      <div className="flex items-center justify-between bg-muted p-3 rounded-lg overflow-hidden">
-        <div className="flex items-center gap-3">
-          <File className="h-5 w-5 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-medium break-all">{file.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {(file.size / 1024 / 1024).toFixed(2)} MB
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            size="sm"
-            onClick={onUpload}
-            disabled={isUploading}
-            className="shrink-0"
-          >
-            <Upload className="h-3 w-3 mr-1" />
-            Загрузить
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={onCancel}
-            className="shrink-0"
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function UploadProgress({ progress }: { progress: number }) {
-  return (
-    <div className="p-3 border-b bg-background">
-      <div className="flex items-center gap-2 mb-2 overflow-hidden">
-        <Upload className="h-4 w-4" />
-        <span className="text-sm">Загрузка файла...</span>
-      </div>
-      <Progress value={progress} className="w-full" />
-      <p className="text-xs text-muted-foreground mt-1">
-        {progress.toFixed(0)}%
-      </p>
-    </div>
-  );
-}
 
 function TypingIndicator() {
   return (
@@ -212,16 +104,10 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
   ]);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
 
-  // File upload state
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadedFileId, setUploadedFileId] = useState<string | null>(null);
 
   // Refs
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll to bottom
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
@@ -240,173 +126,6 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
     return () => clearTimeout(timeoutId);
   }, [messages.length, isLoading, open, scrollToBottom]);
 
-  // File handling
-  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Validate file size (max 100MB)
-      if (file.size > 100 * 1024 * 1024) {
-        toast.error('Файл слишком большой. Максимальный размер: 100MB');
-        return;
-      }
-      setSelectedFile(file);
-      toast.success(`Файл выбран: ${file.name}`);
-    }
-  }, []);
-
-  const uploadFile = useCallback(async (file: File): Promise<string> => {
-    // Simulate progress for better UX
-    let progress = 0;
-    const progressInterval = setInterval(() => {
-      progress += Math.random() * 20;
-      if (progress >= 90) {
-        progress = 90;
-        clearInterval(progressInterval);
-      }
-      setUploadProgress(progress);
-    }, 150);
-
-    try {
-      const fileUrl = await uploadFileToServer(file);
-      setUploadProgress(100);
-      return fileUrl;
-    } catch (error) {
-      clearInterval(progressInterval);
-      throw error;
-    }
-  }, []);
-
-  const handleFileUpload = useCallback(async () => {
-    if (!selectedFile) return;
-
-    setIsUploading(true);
-    setUploadProgress(0);
-
-    try {
-      const fileUrl = await uploadFile(selectedFile);
-
-      // Add file message to chat
-      const fileMessageId = Date.now().toString();
-      const fileMessage: Message = {
-        id: fileMessageId,
-        content: `Файл загружен: ${selectedFile.name}`,
-        sender: 'user',
-        timestamp: new Date(),
-        type: 'file',
-        fileName: selectedFile.name,
-        fileSize: selectedFile.size,
-        fileUrl: fileUrl,
-        fileStatus: 'uploaded',
-      };
-
-      setMessages((prev) => [...prev, fileMessage]);
-      setUploadedFileId(fileMessageId);
-
-      // Небольшая задержка перед очисткой состояния для стабильности UI
-      setTimeout(() => {
-        setSelectedFile(null);
-        setUploadProgress(0);
-      }, 200);
-
-      // Enhanced bot notifications
-      const fileExtension = selectedFile.name.split('.').pop()?.toLowerCase();
-      let fileTypeMessage = '';
-
-      // Определяем тип файла для более точного сообщения
-      if (['png', 'jpg', 'jpeg'].includes(fileExtension || '')) {
-        fileTypeMessage = 'изображение';
-      } else if (['stl'].includes(fileExtension || '')) {
-        fileTypeMessage = '3D модель STL';
-      } else if (['obj'].includes(fileExtension || '')) {
-        fileTypeMessage = '3D модель OBJ';
-      } else if (['dae'].includes(fileExtension || '')) {
-        fileTypeMessage = '3D модель DAE';
-      } else if (['zip', 'tar', '7z', 'rar'].includes(fileExtension || '')) {
-        fileTypeMessage = 'архив';
-      } else {
-        fileTypeMessage = 'файл';
-      }
-
-      // Первое уведомление - подтверждение получения
-      const botNotification1: Message = {
-        id: (Date.now() + 1).toString(),
-        content: `✅ ${fileTypeMessage} "${selectedFile.name}" успешно получен!`,
-        sender: 'bot',
-        timestamp: new Date(),
-      };
-
-      // Второе уведомление - анализ файла
-      const botNotification2: Message = {
-        id: (Date.now() + 2).toString(),
-        content: `🔍 Анализирую ${fileTypeMessage}... Пожалуйста, подождите.`,
-        sender: 'bot',
-        timestamp: new Date(),
-      };
-
-      // Финальное уведомление - готовность к работе
-      const botNotification3: Message = {
-        id: (Date.now() + 3).toString(),
-        content: `🎯 ${fileTypeMessage} готов для обработки! Можете задавать вопросы по содержимому файла или просить помощи с ним.`,
-        sender: 'bot',
-        timestamp: new Date(),
-      };
-
-      // Обновляем статус файла и показываем уведомления с requestAnimationFrame для лучшей производительности
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          setMessages((prev) =>
-            prev.map(msg =>
-              msg.id === uploadedFileId
-                ? { ...msg, fileStatus: 'processing' as const }
-                : msg
-            )
-          );
-          setMessages((prev) => [...prev, botNotification1]);
-        }, 500);
-
-        setTimeout(() => {
-          setMessages((prev) => [...prev, botNotification2]);
-        }, 1500);
-
-        setTimeout(() => {
-          setMessages((prev) =>
-            prev.map(msg =>
-              msg.id === uploadedFileId
-                ? { ...msg, fileStatus: 'ready' as const }
-                : msg
-            )
-          );
-          setMessages((prev) => [...prev, botNotification3]);
-          setUploadedFileId(null);
-        }, 3000);
-      });
-
-      // Toast уведомления
-      toast.success(`Файл "${selectedFile.name}" успешно загружен!`);
-      setTimeout(() => {
-        toast.info('Бот анализирует ваш файл...', { duration: 2000 });
-      }, 1000);
-    } catch (error) {
-      toast.error('Ошибка при загрузке файла');
-      console.error('Upload error:', error);
-    } finally {
-      // Небольшая задержка перед окончанием загрузки для стабильности UI
-      setTimeout(() => {
-        setIsUploading(false);
-      }, 300);
-    }
-  }, [selectedFile, uploadFile, uploadedFileId]);
-
-  const clearSelectedFile = useCallback(() => {
-    // Небольшая задержка для плавного исчезновения UI элементов
-    setTimeout(() => {
-      setSelectedFile(null);
-      setUploadProgress(0);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }, 100);
-  }, []);
 
   // Message handling
   const sendMessage = useCallback(async (message: string) => {
@@ -502,12 +221,6 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
   }, [abortController]);
 
   const clearChat = useCallback(() => {
-    // Очищаем все состояния
-    setSelectedFile(null);
-    setUploadProgress(0);
-    setIsUploading(false);
-    setUploadedFileId(null);
-
     // Небольшая задержка перед установкой новых сообщений для плавности
     setTimeout(() => {
       setMessages([
@@ -583,45 +296,14 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
 
           {/* Input area - Fixed at bottom */}
           <div className="border-t bg-background shrink-0">
-            {/* File preview - only when file selected */}
-            {selectedFile && !isUploading && (
-              <FilePreview
-                file={selectedFile}
-                onUpload={handleFileUpload}
-                onCancel={clearSelectedFile}
-                isUploading={isUploading}
-              />
-            )}
-
-            {/* Upload progress - only when uploading */}
-            {isUploading && <UploadProgress progress={uploadProgress} />}
-
             {/* Input form - always visible */}
             <form onSubmit={handleSubmit} className="p-3 flex items-end gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                onChange={handleFileSelect}
-                className="hidden"
-                accept=".stl,.obj,.dae,.zip,.tar,.7z,.rar,.png,.jpg,.jpeg"
-              />
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isLoading || isUploading}
-                className="shrink-0"
-                aria-label="Прикрепить файл"
-              >
-                <Paperclip className="h-4 w-4" />
-              </Button>
               <Textarea
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Введите сообщение... (Enter — отправить, Shift+Enter — новая строка)"
-                disabled={isLoading || isUploading}
+                disabled={isLoading}
                 rows={1}
                 className="flex-1 resize-none max-h-32"
               />
@@ -630,7 +312,7 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
                   <X className="h-4 w-4" />
                 </Button>
               ) : (
-                <Button type="submit" size="icon" disabled={!inputMessage.trim() || isUploading} className="shrink-0" aria-label="Отправить">
+                <Button type="submit" size="icon" disabled={!inputMessage.trim()} className="shrink-0" aria-label="Отправить">
                   <Send className="h-4 w-4" />
                 </Button>
               )}
