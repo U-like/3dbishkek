@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, X, Bot, User, RotateCcw } from 'lucide-react';
+import { Send, X, Bot, User, RotateCcw, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -21,9 +21,26 @@ interface ChatDialogProps {
 // Constants
 const API_KEY = import.meta.env.VITE_ZAI_API_KEY || 'ee85251eddbd4d74bf97ed21916a37df.6uXGJqojuyLrx8rR';
 const CHAT_HEIGHT = '600px';
-const INPUT_AREA_HEIGHT = 'auto'; // Will be calculated dynamically
+const INPUT_AREA_HEIGHT = 'auto';
+const BASE_PATH = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+const UPLOAD_ENDPOINT = `${BASE_PATH}/api/upload.php`;
 
 // Sub-components
+function renderContent(text: string) {
+  const urlPattern = /(https?:\/\/[^\s]+)/gi;
+  const parts = text.split(urlPattern);
+  return parts.map((part, idx) => {
+    if (/^https?:\/\//i.test(part)) {
+      return (
+        <a key={idx} href={part} target="_blank" rel="noopener noreferrer" className="underline text-primary break-all">
+          {part}
+        </a>
+      );
+    }
+    return <span key={idx}>{part}</span>;
+  });
+}
+
 function MessageItem({ message }: { message: Message }) {
   return (
     <div className={`flex w-full items-start gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -34,10 +51,12 @@ function MessageItem({ message }: { message: Message }) {
       )}
 
       <div className="flex flex-col max-w-[80%]">
-        <div className={`px-4 py-2 rounded-lg ${
-          message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
-        }`}>
-          <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+        <div
+          className={`px-4 py-2 rounded-lg ${
+            message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
+          }`}
+        >
+          <p className="text-sm whitespace-pre-wrap break-words">{renderContent(message.content)}</p>
         </div>
 
         <p className="text-xs opacity-70 mt-1 px-1">
@@ -56,7 +75,6 @@ function MessageItem({ message }: { message: Message }) {
     </div>
   );
 }
-
 
 function TypingIndicator() {
   return (
@@ -81,13 +99,15 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: 'Привет! Я консультант 3dbishkek.kg. Помогу вам узнать всё о 3D печати, материалах и технологиях. Чем могу помочь?',
+      content:
+        'Привет! Я консультант 3dbishkek.kg. Помогу вам узнать всё о 3D печати, материалах и технологиях. Чем могу помочь?',
       sender: 'bot',
       timestamp: new Date(),
     },
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [conversationHistory, setConversationHistory] = useState<Array<{ role: string; content: string }>>([
     {
       role: 'system',
@@ -104,16 +124,15 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
   ]);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
 
-
   // Refs
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll to bottom
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
     const container = scrollRef.current;
     if (container) {
-      // Use both scrollTo and scrollIntoView for better compatibility
       container.scrollTop = container.scrollHeight;
       endRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
     }
@@ -121,35 +140,76 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
 
   useEffect(() => {
     if (!open) return;
-    // Use setTimeout for better reliability
     const timeoutId = setTimeout(() => scrollToBottom('smooth'), 100);
     return () => clearTimeout(timeoutId);
   }, [messages.length, isLoading, open, scrollToBottom]);
 
-
   // Message handling
-  const sendMessage = useCallback(async (message: string) => {
-    const trimmed = message.trim();
-    if (!trimmed || isLoading) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: trimmed,
-      sender: 'user',
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInputMessage('');
-    setIsLoading(true);
-
-    const newHistory = [...conversationHistory, { role: 'user', content: trimmed }];
-    setConversationHistory(newHistory);
+  const sendMessage = useCallback(async () => {
+    if (isLoading) return;
+    const trimmed = inputMessage.trim();
+    if (!trimmed && !selectedFile) return;
 
     const controller = new AbortController();
     setAbortController(controller);
+    setIsLoading(true);
 
     try {
+      // 1) Upload file first if present
+      let fileInfo: { url: string; name: string } | null = null;
+      if (selectedFile) {
+        try {
+          const formData = new FormData();
+          formData.append('file', selectedFile);
+
+          const uploadResponse = await fetch(UPLOAD_ENDPOINT, {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal,
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error(`UPLOAD_HTTP_${uploadResponse.status}`);
+          }
+          const uploadData = await uploadResponse.json();
+          if (!uploadData?.success || !uploadData?.url) {
+            throw new Error(uploadData?.error || 'UPLOAD_FAILED');
+          }
+          fileInfo = { url: uploadData.url, name: uploadData.name || selectedFile.name };
+        } catch (uploadErr) {
+          // If upload failed but user typed text - proceed with text only
+          if (trimmed) {
+            toast.info('Файл не удалось загрузить. Сообщение отправлено без файла.');
+          } else {
+            // Only file (no text) - abort with error
+            throw uploadErr;
+          }
+        }
+      }
+
+      // 2) Build user content with optional file link
+      let contentToSend = trimmed;
+      if (fileInfo) {
+        const fileLine = `Прикрепленный файл: ${fileInfo.url}`;
+        contentToSend = trimmed ? `${trimmed}\n${fileLine}` : fileLine;
+      }
+
+      // 3) Echo user message
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        content: contentToSend,
+        sender: 'user',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, userMessage]);
+      setInputMessage('');
+      setSelectedFile(null);
+
+      // 4) Update history
+      const newHistory = [...conversationHistory, { role: 'user', content: contentToSend }];
+      setConversationHistory(newHistory);
+
+      // 5) Ask bot
       const response = await fetch('https://api.z.ai/api/paas/v4/chat/completions', {
         method: 'POST',
         headers: {
@@ -186,33 +246,33 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
       const name = err && typeof err === 'object' && 'name' in err ? (err as { name: string }).name : '';
       if (name === 'AbortError') {
         toast.info('Запрос отменен');
-        return;
-      }
-
-      let errorMessage = 'Произошла ошибка. Попробуйте позже.';
-      if (err instanceof Error) {
-        if (err.message.includes('401')) {
-          errorMessage = 'Ошибка авторизации. Проверьте API-ключ.';
-        } else if (err.message.includes('429')) {
-          errorMessage = 'Слишком много запросов. Попробуйте позже.';
-        } else if (err.message.includes('404')) {
-          errorMessage = 'Сервис временно недоступен.';
+      } else {
+        let errorMessage = 'Произошла ошибка. Попробуйте позже.';
+        if (err instanceof Error) {
+          if (err.message.includes('401')) {
+            errorMessage = 'Ошибка авторизации. Проверьте API-ключ.';
+          } else if (err.message.includes('429')) {
+            errorMessage = 'Слишком много запросов. Попробуйте позже.';
+          } else if (err.message.includes('404')) {
+            errorMessage = 'Сервис временно недоступен.';
+          } else if (err.message.includes('UPLOAD')) {
+            errorMessage = 'Не удалось загрузить файл. Попробуйте другой файл или позже.';
+          }
         }
+        toast.error(errorMessage);
+        const errMsg: Message = {
+          id: (Date.now() + 1).toString(),
+          content: errorMessage,
+          sender: 'bot',
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, errMsg]);
       }
-
-      toast.error(errorMessage);
-      const errMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        content: errorMessage,
-        sender: 'bot',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errMsg]);
     } finally {
       setIsLoading(false);
       setAbortController(null);
     }
-  }, [isLoading, conversationHistory]);
+  }, [isLoading, inputMessage, selectedFile, conversationHistory]);
 
   const cancelRequest = useCallback(() => {
     if (abortController) {
@@ -221,12 +281,12 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
   }, [abortController]);
 
   const clearChat = useCallback(() => {
-    // Небольшая задержка перед установкой новых сообщений для плавности
     setTimeout(() => {
       setMessages([
         {
           id: '1',
-          content: 'Привет! Я консультант 3dbishkek.kg. Помогу вам узнать всё о 3D печати, материалах и технологиях. Чем могу помочь?',
+          content:
+            'Привет! Я консультант 3dbishkek.kg. Помогу вам узнать всё о 3D печати, материалах и технологиях. Чем могу помочь?',
           sender: 'bot',
           timestamp: new Date(),
         },
@@ -246,25 +306,41 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
         },
       ]);
 
-      // Прокрутка к началу после небольшой задержки
       setTimeout(() => {
         requestAnimationFrame(() => scrollToBottom('auto'));
       }, 100);
     }, 200);
   }, [scrollToBottom]);
 
-  // Form handlers
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    sendMessage(inputMessage);
-  }, [inputMessage, sendMessage]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage(inputMessage);
+  // File + form handlers
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    if (file) {
+      setSelectedFile(file);
     }
-  }, [inputMessage, sendMessage]);
+    // Allow re-selecting the same file
+    e.currentTarget.value = '';
+  }, []);
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      sendMessage();
+    },
+    [sendMessage]
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (inputMessage.trim() || selectedFile) {
+          sendMessage();
+        }
+      }
+    },
+    [inputMessage, selectedFile, sendMessage]
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -276,12 +352,18 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
               <Bot className="h-5 w-5 text-primary" />
               Чат с поддержкой
             </DialogTitle>
-            <Button variant="ghost" size="icon" onClick={clearChat} className="h-8 w-8" aria-label="Очистить чат">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={clearChat}
+              className="h-8 w-8"
+              aria-label="Очистить чат"
+            >
               <RotateCcw className="h-4 w-4" />
             </Button>
           </DialogHeader>
 
-          {/* Messages area - Scrollable, takes remaining space */}
+          {/* Messages area */}
           <div
             ref={scrollRef}
             className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 pr-2 space-y-4 min-h-0 hide-scrollbar"
@@ -296,8 +378,48 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
 
           {/* Input area - Fixed at bottom */}
           <div className="border-t bg-background shrink-0">
+            {selectedFile && (
+              <div className="px-3 pt-2">
+                <div className="inline-flex items-center gap-2 bg-muted rounded px-2 py-1 text-xs">
+                  <span className="max-w-[220px] truncate">{selectedFile.name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5"
+                    onClick={() => setSelectedFile(null)}
+                    aria-label="Удалить файл"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Input form - always visible */}
             <form onSubmit={handleSubmit} className="p-3 flex items-end gap-2">
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                onChange={handleFileChange}
+                className="hidden"
+                accept=".stl,.obj,.step,.stp,.iges,.igs,.zip,.rar,.7z,application/pdf,image/*"
+              />
+
+              {/* Attach button */}
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                className="shrink-0"
+                disabled={isLoading}
+                aria-label="Прикрепить файл"
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
+
               <Textarea
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
@@ -308,11 +430,24 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
                 className="flex-1 resize-none max-h-32"
               />
               {isLoading ? (
-                <Button type="button" size="icon" onClick={cancelRequest} variant="outline" className="shrink-0" aria-label="Остановить ответ">
+                <Button
+                  type="button"
+                  size="icon"
+                  onClick={cancelRequest}
+                  variant="outline"
+                  className="shrink-0"
+                  aria-label="Остановить ответ"
+                >
                   <X className="h-4 w-4" />
                 </Button>
               ) : (
-                <Button type="submit" size="icon" disabled={!inputMessage.trim()} className="shrink-0" aria-label="Отправить">
+                <Button
+                  type="submit"
+                  size="icon"
+                  disabled={!inputMessage.trim() && !selectedFile}
+                  className="shrink-0"
+                  aria-label="Отправить"
+                >
                   <Send className="h-4 w-4" />
                 </Button>
               )}
