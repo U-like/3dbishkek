@@ -53,10 +53,9 @@ $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
 
 // Allowed extensions and some MIME checks
 $allowedExts = [
-    'stl','obj','step','stp','iges','igs',
-    'zip','rar','7z',
-    'pdf',
-    'png','jpg','jpeg','gif','webp'
+    'stl','obj','dae','fbx',
+    'zip','tar','rar','7z','7zip',
+    'png','jpg','jpeg'
 ];
 if (!in_array($ext, $allowedExts, true)) {
     respond(400, ['success' => false, 'error' => 'EXTENSION_NOT_ALLOWED']);
@@ -64,10 +63,10 @@ if (!in_array($ext, $allowedExts, true)) {
 
 // Additional MIME validation (best-effort; some CAD files may be octet-stream)
 $allowedMimes = [
-    'application/pdf',
-    'image/png','image/jpeg','image/gif','image/webp',
-    'application/zip','application/x-rar-compressed','application/x-7z-compressed',
-    'application/octet-stream','model/stl','text/plain','application/iges','model/iges','application/step','model/step'
+    'image/png','image/jpeg',
+    'application/zip','application/x-tar','application/x-rar-compressed','application/x-7z-compressed',
+    'application/xml','text/xml','model/vnd.collada+xml',
+    'application/octet-stream','text/plain','model/stl'
 ];
 
 $tmpPath = $file['tmp_name'] ?? '';
@@ -86,7 +85,7 @@ if ($mime === false || !is_string($mime) || $mime === '') {
 // Only enforce MIME for known doc/image/archive; CAD files often show as octet-stream, which we allow
 if (!in_array($mime, $allowedMimes, true)) {
     // Still allow if extension is CAD formats and mime is octet-stream/text/plain
-    $cadExts = ['stl','obj','step','stp','iges','igs'];
+    $cadExts = ['stl','obj','dae','fbx'];
     if (!(in_array($ext, $cadExts, true) && ($mime === 'application/octet-stream' || $mime === 'text/plain'))) {
         respond(400, ['success' => false, 'error' => 'MIME_NOT_ALLOWED', 'mime' => $mime]);
     }

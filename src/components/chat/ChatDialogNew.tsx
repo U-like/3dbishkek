@@ -24,6 +24,21 @@ const CHAT_HEIGHT = '600px';
 const INPUT_AREA_HEIGHT = 'auto';
 const BASE_PATH = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
 const UPLOAD_ENDPOINT = `${BASE_PATH}/api/upload.php`;
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
+// Helpers
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes)) return '';
+  const units = ['Б', 'КБ', 'МБ', 'ГБ'];
+  let i = 0;
+  let value = bytes;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
+    i++;
+  }
+  const fraction = value < 10 && i > 0 ? 1 : 0;
+  return `${value.toFixed(fraction)} ${units[i]}`;
+}
+const ALLOWED_EXTS = ['stl','obj','dae','fbx','zip','tar','rar','7z','7zip','png','jpg','jpeg'];
 
 // Sub-components
 function renderContent(text: string) {
@@ -316,6 +331,17 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     if (file) {
+      const ext = file.name.split('.').pop()?.toLowerCase() || '';
+      if (!ALLOWED_EXTS.includes(ext)) {
+        toast.error('Неподдерживаемый формат файла. Разрешено: stl, obj, dae, fbx, zip, tar, rar, 7zip, png, jpg, jpeg');
+        e.currentTarget.value = '';
+        return;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error('Файл слишком большой. Максимум 25 МБ');
+        e.currentTarget.value = '';
+        return;
+      }
       setSelectedFile(file);
     }
     // Allow re-selecting the same file
@@ -382,6 +408,7 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
               <div className="px-3 pt-2">
                 <div className="inline-flex items-center gap-2 bg-muted rounded px-2 py-1 text-xs">
                   <span className="max-w-[220px] truncate">{selectedFile.name}</span>
+                  <span className="text-muted-foreground">• {formatBytes(selectedFile.size)}</span>
                   <Button
                     type="button"
                     variant="ghost"
@@ -396,6 +423,11 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
               </div>
             )}
 
+            <div className="px-3 pt-1 pb-0.5">
+              <p className="text-[11px] text-muted-foreground">
+                Форматы: stl, obj, dae, fbx, zip, tar, rar, 7zip, png, jpg, jpeg. До 25 МБ
+              </p>
+            </div>
             {/* Input form - always visible */}
             <form onSubmit={handleSubmit} className="p-3 flex items-end gap-2">
               {/* Hidden file input */}
@@ -404,7 +436,7 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
                 type="file"
                 onChange={handleFileChange}
                 className="hidden"
-                accept=".stl,.obj,.step,.stp,.iges,.igs,.zip,.rar,.7z,application/pdf,image/*"
+                accept=".stl,.obj,.dae,.fbx,.zip,.tar,.rar,.7z,.7zip,.png,.jpg,.jpeg"
               />
 
               {/* Attach button */}
