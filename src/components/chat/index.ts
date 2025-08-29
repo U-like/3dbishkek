@@ -1,2 +1,2 @@
 export { ChatButton } from './ChatButton';
-export { ChatDialog } from './ChatDialog';
+export { ChatDialogNew } from './ChatDialogNew';

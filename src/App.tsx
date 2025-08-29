@@ -12,7 +12,7 @@ import { Categories } from '@/components/sections/Categories';
 import { Products } from '@/components/sections/Products';
 import { Footer } from '@/components/layout/Footer';
 import { OrderPage } from '@/pages/Order';
-import { ChatButton, ChatDialog } from '@/components/chat';
+import { ChatButton, ChatDialogNew } from '@/components/chat';
 import CookieConsentBanner from '@/components/cookies/CookieConsent';
  
 // Lazy load heavy components
@@ -72,7 +72,7 @@ const App = () => {
 
           {/* Global Chat Components */}
           <ChatButton onClick={() => setIsChatOpen(true)} />
-          <ChatDialog open={isChatOpen} onOpenChange={setIsChatOpen} />
+          <ChatDialogNew open={isChatOpen} onOpenChange={setIsChatOpen} />
         </div>
       </TooltipProvider>
     </QueryClientProvider>
