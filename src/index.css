@@ -125,3 +125,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Utility to hide scrollbar but keep scrolling */
+@layer utilities {
+  .hide-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none;    /* Firefox */
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;            /* Chrome, Safari, Opera */
+  }
+}

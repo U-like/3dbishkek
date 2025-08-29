@@ -571,8 +571,7 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
           {/* Messages area - Scrollable, takes remaining space */}
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-scroll overflow-x-hidden px-4 py-4 pr-2 space-y-4 min-h-0"
-            style={{ scrollbarGutter: 'stable both-edges' }}
+            className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 pr-2 space-y-4 min-h-0 hide-scrollbar"
           >
             {messages.map((message) => (
               <MessageItem key={message.id} message={message} />
