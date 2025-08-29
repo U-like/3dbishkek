@@ -61,7 +61,7 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
     <>
       <header className="fixed top-0 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b z-50">
         <div className="container mx-auto px-4 py-3">
-          <nav className="flex items-center justify-between">
+          <nav className="grid grid-cols-[1fr_auto_1fr] items-center">
             {/* Logo */}
             <div 
               className="flex items-center gap-2 cursor-pointer" 
@@ -71,48 +71,37 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
               <span className="text-2xl font-bold text-primary">3DBishkek</span>
             </div>
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-8">
-              {currentView === 'home' && (
-                <button
-                  onClick={() => handleViewChange('shop')}
-                  className="transition-colors font-medium text-muted-foreground hover:text-primary"
-                >
-                  Магазин
-                </button>
-              )}
-              {navLinks.map((link) => (
-                <button
-                  key={link.href}
-                  onClick={() => scrollToSection(link.href.slice(1))}
-                  className="text-muted-foreground hover:text-primary transition-colors font-medium"
-                >
-                  {link.label}
-                </button>
-              ))}
-              <Button
-                variant="ghost"
-                size="icon"
+            {/* Desktop Navigation - Centered and stable */}
+            <div className="hidden md:flex items-center justify-center gap-8">
+              <button
+                onClick={() => {
+                  if (currentView === 'shop') {
+                    scrollToSection('products');
+                  } else {
+                    handleViewChange('shop');
+                  }
+                }}
+                className="text-muted-foreground hover:text-primary transition-colors font-medium"
+              >
+                Магазин
+              </button>
+              <button
                 onClick={() => setIsContactDialogOpen(true)}
-                className="text-muted-foreground hover:text-primary"
-                title="Контакты"
+                className="text-muted-foreground hover:text-primary transition-colors font-medium"
               >
-                <Phone className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
+                Связь
+              </button>
+              <button
                 onClick={() => setIsAboutDialogOpen(true)}
-                className="text-muted-foreground hover:text-primary"
-                title="О нас"
+                className="text-muted-foreground hover:text-primary transition-colors font-medium"
               >
-                <HelpCircle className="h-5 w-5" />
-              </Button>
+                О нас
+              </button>
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-3">
-              {/* Theme Toggle - Always visible on desktop */}
+            <div className="flex items-center gap-3 justify-end">
+              {/* Theme Toggle - Always visible on desktop, stays on the right */}
               <div className="hidden md:block">
                 <ThemeToggle />
               </div>
@@ -229,7 +218,7 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
 
       {/* Sidebars - Always available */}
       <CartSidebar open={isCartOpen} onOpenChange={setCartOpen} />
-      ..<FavoritesSidebar open={isFavoritesOpen} onOpenChange={setFavoritesOpen} />
+      <FavoritesSidebar open={isFavoritesOpen} onOpenChange={setFavoritesOpen} />
       
 
       
