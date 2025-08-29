@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => ({
         manualChunks: {
           // Separate vendor chunks
           vendor: ['react', 'react-dom'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-sheet', '@radix-ui/react-dropdown-menu'],
+          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
           three: ['three'],
           utils: ['zustand', 'clsx', 'tailwind-merge'],
         },

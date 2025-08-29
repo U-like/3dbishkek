@@ -12,7 +12,9 @@ import { Categories } from '@/components/sections/Categories';
 import { Products } from '@/components/sections/Products';
 import { Footer } from '@/components/layout/Footer';
 import { OrderPage } from '@/pages/Order';
-
+import { ChatButton, ChatDialog } from '@/components/chat';
+import CookieConsentBanner from '@/components/cookies/CookieConsent';
+ 
 // Lazy load heavy components
 const ThreeBackground = lazy(() => import('@/components/3d/ThreeBackground').then(module => ({ default: module.ThreeBackground })));
 
@@ -20,12 +22,14 @@ const queryClient = new QueryClient();
 
 const App = () => {
   const [currentView, setCurrentView] = useState<'home' | 'shop' | 'order'>('home');
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   return (
     <ThemeProvider defaultTheme="light" storageKey="3dbishkek-theme">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />
+          <CookieConsentBanner />
           <div className="min-h-screen">
           {currentView === 'home' ? (
             // Home Page
@@ -65,11 +69,15 @@ const App = () => {
             // Order Page
             <OrderPage onViewChange={setCurrentView} />
           )}
+
+          {/* Global Chat Components */}
+          <ChatButton onClick={() => setIsChatOpen(true)} />
+          <ChatDialog open={isChatOpen} onOpenChange={setIsChatOpen} />
         </div>
       </TooltipProvider>
     </QueryClientProvider>
-    </ThemeProvider>
-  );
+  </ThemeProvider>
+);
 };
 
 export default App;
