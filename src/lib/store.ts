@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { Product, CartItem, CategoryFilter } from '@/types';
+import { cookieStorage } from '@/lib/cookieStorage';
 
 interface AppState {
   // Cart state
@@ -97,10 +98,10 @@ export const useAppStore = create<AppState>()(
       setFavoritesOpen: (open) => set({ isFavoritesOpen: open }),
     }),
     {
-      name: 'marketplace-storage',
+      name: 'marketplace-store-v1',
+      storage: createJSONStorage(() => cookieStorage),
       partialize: (state) => ({
         cart: state.cart,
-        cartTotal: state.cartTotal,
         favorites: state.favorites,
       }),
     }
