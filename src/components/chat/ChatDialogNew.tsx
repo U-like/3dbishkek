@@ -158,7 +158,7 @@ export function ChatDialogNew({ open, onOpenChange }: ChatDialogProps) {
           'Accept-Language': 'en-US,en',
         },
         body: JSON.stringify({
-          model: 'glm-4.5',
+          model: 'GLM-4.5-Flash',
           messages: newHistory,
           temperature: 0.6,
           max_tokens: 1024,
